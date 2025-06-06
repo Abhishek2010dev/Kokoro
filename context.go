@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -319,6 +320,27 @@ func (c *Context) Subdomains(offset ...int) []string {
 	}
 
 	return parts[:len(parts)-n]
+}
+
+func (c *Context) Fresh() bool {
+	ifModifiedSince := c.GetHeader(HeaderIfModifiedSince)
+	ifNoneMatch := c.GetHeader(HeaderIfNoneMatch)
+	etag := c.GetHeader(HeaderETag)
+	lastModified := c.GetHeader(HeaderLastModified)
+
+	if ifNoneMatch != "" && etag != "" && ifNoneMatch == etag {
+		return true
+	}
+
+	if ifModifiedSince != "" && lastModified != "" {
+		if modTime, err := http.ParseTime(ifModifiedSince); err == nil {
+			if lastTime, err2 := http.ParseTime(lastModified); err2 == nil && !lastTime.After(modTime) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (c *Context) IsXHR() bool {
