@@ -57,3 +57,7 @@ func (c *Context) FormValue(key string, defaultValue ...string) string {
 	}
 	return string(val)
 }
+
+func (c *Context) MultipartForm() (*multipart.Form, error) {
+	return c.ctx.MultipartForm()
+}
