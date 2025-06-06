@@ -346,6 +346,10 @@ func (c *Context) Fresh() bool {
 	return false
 }
 
+func (c *Context) Stale() bool {
+	return !c.Fresh()
+}
+
 func (c *Context) IsXHR() bool {
 	return c.GetHeader(HeaderXRequestedWith) == "XMLHttpRequest"
 }
@@ -353,4 +357,3 @@ func (c *Context) IsXHR() bool {
 // param functions
 // IsProxyTrusted
 // SaveFile and SaveFileToStorage
-// stale
