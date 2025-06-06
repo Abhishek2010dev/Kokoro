@@ -86,3 +86,25 @@ func (c *Context) RealIP() string {
 
 	return c.ctx.RemoteIP().String()
 }
+
+func (c *Context) Queries() map[string]string {
+	queryArgs := c.ctx.QueryArgs()
+	params := make(map[string]string, queryArgs.Len())
+
+	queryArgs.VisitAll(func(key, value []byte) {
+		params[string(key)] = string(value)
+	})
+
+	return params
+}
+
+func (c *Context) Query(key string, defaultValue ...string) string {
+	query := c.ctx.QueryArgs().Peek(key)
+	if len(query) > 0 {
+		return string(query)
+	}
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+	return ""
+}
