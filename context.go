@@ -108,3 +108,19 @@ func (c *Context) Query(key string, defaultValue ...string) string {
 	}
 	return ""
 }
+
+func (c *Context) GetHeader(key string) string {
+	return string(c.ctx.Request.Header.Peek(key))
+}
+
+func (c *Context) SetHeader(key, value string) {
+	c.ctx.Request.Header.Set(key, value)
+}
+
+func (c *Context) GetAllHeaders() map[string]string {
+	headers := make(map[string]string)
+	c.ctx.Request.Header.VisitAll(func(key, value []byte) {
+		headers[string(key)] = string(value)
+	})
+	return headers
+}
