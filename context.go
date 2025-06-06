@@ -74,3 +74,15 @@ func (c *Context) GetForwardedIPs() []string {
 	}
 	return parts
 }
+
+func (c *Context) RealIP() string {
+	xForwardedFor := c.ctx.Request.Header.Peek("X-Forwarded-For")
+	if xForwardedFor != nil {
+		parts := strings.Split(string(xForwardedFor), ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+
+	return c.ctx.RemoteIP().String()
+}
