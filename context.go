@@ -321,6 +321,10 @@ func (c *Context) Subdomains(offset ...int) []string {
 	return parts[:len(parts)-n]
 }
 
+func (c *Context) IsXHR() bool {
+	return c.GetHeader(HeaderXRequestedWith) == "XMLHttpRequest"
+}
+
 // param functions
 // IsProxyTrusted
 // Fresh

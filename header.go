@@ -290,4 +290,8 @@ const (
 
 	// HeaderXXSSProtection enables cross-site scripting (XSS) filters.
 	HeaderXXSSProtection = "X-XSS-Protection"
+
+	// HeaderXRequestedWith is a non-standard header used to identify AJAX (XHR) requests.
+	// Commonly set to "XMLHttpRequest" by client-side libraries like jQuery.
+	HeaderXRequestedWith = "X-Requested-With"
 )
