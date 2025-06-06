@@ -1,6 +1,8 @@
 package kokoro
 
 import (
+	"errors"
+	"fmt"
 	"mime/multipart"
 	"net"
 	"sort"
@@ -212,6 +214,92 @@ func (c *Context) Port() string {
 
 func (c *Context) Protocol() string {
 	return string(c.ctx.Request.Header.Protocol())
+}
+
+type HTTPRange struct {
+	Start, End int64
+}
+
+type Range struct {
+	Type   string
+	Ranges []HTTPRange
+}
+
+func (c *Context) Range(maxSize int64) (*Range, error) {
+	header := string(c.ctx.Request.Header.Peek("Range"))
+	if header == "" {
+		return nil, errors.New("no Range header")
+	}
+
+	parts := strings.SplitN(header, "=", 2)
+	if len(parts) != 2 {
+		return nil, errors.New("invalid Range header format")
+	}
+
+	unit := strings.TrimSpace(parts[0])
+	rangesSpec := parts[1]
+
+	rangesStrs := strings.Split(rangesSpec, ",")
+	var ranges []HTTPRange
+
+	for _, r := range rangesStrs {
+		r = strings.TrimSpace(r)
+		bounds := strings.SplitN(r, "-", 2)
+		if len(bounds) != 2 {
+			return nil, fmt.Errorf("invalid range: %s", r)
+		}
+
+		var start, end int64
+		var err error
+
+		if bounds[0] == "" {
+			// suffix byte range: "-500" means last 500 bytes
+			end, err = strconv.ParseInt(bounds[1], 10, 64)
+			if err != nil || end <= 0 {
+				return nil, fmt.Errorf("invalid suffix range: %s", r)
+			}
+			if end > maxSize {
+				end = maxSize
+			}
+			start = maxSize - end
+			if start < 0 {
+				start = 0
+			}
+			end = maxSize - 1
+		} else {
+			start, err = strconv.ParseInt(bounds[0], 10, 64)
+			if err != nil || start < 0 {
+				return nil, fmt.Errorf("invalid start range: %s", r)
+			}
+			if bounds[1] != "" {
+				end, err = strconv.ParseInt(bounds[1], 10, 64)
+				if err != nil || end < start {
+					return nil, fmt.Errorf("invalid end range: %s", r)
+				}
+				if end >= maxSize {
+					end = maxSize - 1
+				}
+			} else {
+				end = maxSize - 1
+			}
+		}
+
+		if start >= maxSize {
+			// ignore invalid range
+			continue
+		}
+
+		ranges = append(ranges, HTTPRange{Start: start, End: end})
+	}
+
+	if len(ranges) == 0 {
+		return nil, errors.New("no valid ranges")
+	}
+
+	return &Range{
+		Type:   unit,
+		Ranges: ranges,
+	}, nil
 }
 
 // param functions
