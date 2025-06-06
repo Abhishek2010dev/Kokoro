@@ -198,3 +198,7 @@ func (c *Context) AcceptsEncodings(offers ...string) string {
 func (c *Context) AcceptsLanguages(offers ...string) string {
 	return matchAccept(c.GetHeader(HeaderAcceptLanguage), offers)
 }
+
+func (c *Context) IsFromLocal() bool {
+	return c.ctx.RemoteIP().IsLoopback()
+}
