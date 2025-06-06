@@ -2,6 +2,7 @@ package kokoro
 
 import (
 	"mime/multipart"
+	"strings"
 
 	"github.com/valyala/fasthttp"
 )
@@ -60,4 +61,16 @@ func (c *Context) FormValue(key string, defaultValue ...string) string {
 
 func (c *Context) MultipartForm() (*multipart.Form, error) {
 	return c.ctx.MultipartForm()
+}
+
+func (c *Context) GetForwardedIPs() []string {
+	xForwardedFor := c.ctx.Request.Header.Peek("X-Forwarded-For")
+	if xForwardedFor == nil {
+		return nil
+	}
+	parts := strings.Split(string(xForwardedFor), ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
 }
