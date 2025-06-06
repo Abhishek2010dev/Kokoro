@@ -2,6 +2,8 @@ package kokoro
 
 import (
 	"mime/multipart"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/valyala/fasthttp"
@@ -123,4 +125,80 @@ func (c *Context) GetAllHeaders() map[string]string {
 		headers[string(key)] = string(value)
 	})
 	return headers
+}
+
+type acceptItem struct {
+	value string
+	q     float64
+}
+
+func parseAccept(header string) []acceptItem {
+	parts := strings.Split(header, ",")
+	items := make([]acceptItem, 0, len(parts))
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		q := 1.0
+		if idx := strings.Index(part, ";q="); idx != -1 {
+			qValStr := part[idx+3:]
+			part = part[:idx]
+			if qVal, err := strconv.ParseFloat(qValStr, 64); err == nil {
+				q = qVal
+			}
+		}
+		items = append(items, acceptItem{value: strings.ToLower(part), q: q})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].q > items[j].q
+	})
+
+	return items
+}
+
+func matchAccept(header string, offers []string) string {
+	if header == "" || len(offers) == 0 {
+		return ""
+	}
+
+	accepted := parseAccept(header)
+	offersLower := make([]string, len(offers))
+	for i, o := range offers {
+		offersLower[i] = strings.ToLower(o)
+	}
+
+	for _, acc := range accepted {
+		for i, offer := range offersLower {
+			if acc.value == offer || acc.value == "*" {
+				return offers[i]
+			}
+			if strings.HasSuffix(acc.value, "/*") {
+				prefix := strings.TrimSuffix(acc.value, "*")
+				if strings.HasPrefix(offer, prefix) {
+					return offers[i]
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func (c *Context) Accepts(offers ...string) string {
+	header := string(c.ctx.Request.Header.Peek("Accept"))
+	return matchAccept(header, offers)
+}
+
+func (c *Context) AcceptsCharsets(offers ...string) string {
+	header := string(c.ctx.Request.Header.Peek("Accept-Charset"))
+	return matchAccept(header, offers)
+}
+
+func (c *Context) AcceptsEncodings(offers ...string) string {
+	header := string(c.ctx.Request.Header.Peek("Accept-Encoding"))
+	return matchAccept(header, offers)
+}
+
+func (c *Context) AcceptsLanguages(offers ...string) string {
+	header := string(c.ctx.Request.Header.Peek("Accept-Language"))
+	return matchAccept(header, offers)
 }
