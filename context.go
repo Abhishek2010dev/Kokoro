@@ -66,8 +66,8 @@ func (c *Context) MultipartForm() (*multipart.Form, error) {
 }
 
 func (c *Context) GetForwardedIPs() []string {
-	xForwardedFor := c.ctx.Request.Header.Peek("X-Forwarded-For")
-	if xForwardedFor == nil {
+	xForwardedFor := c.GetHeader(HeaderForwardedFor)
+	if xForwardedFor == "" {
 		return nil
 	}
 	parts := strings.Split(string(xForwardedFor), ",")
@@ -78,8 +78,8 @@ func (c *Context) GetForwardedIPs() []string {
 }
 
 func (c *Context) RealIP() string {
-	xForwardedFor := c.ctx.Request.Header.Peek("X-Forwarded-For")
-	if xForwardedFor != nil {
+	xForwardedFor := c.GetHeader(HeaderForwardedFor)
+	if xForwardedFor != "" {
 		parts := strings.Split(string(xForwardedFor), ",")
 		if len(parts) > 0 {
 			return strings.TrimSpace(parts[0])
@@ -184,21 +184,17 @@ func matchAccept(header string, offers []string) string {
 }
 
 func (c *Context) Accepts(offers ...string) string {
-	header := string(c.ctx.Request.Header.Peek("Accept"))
-	return matchAccept(header, offers)
+	return matchAccept(c.GetHeader(HeaderAccept), offers)
 }
 
 func (c *Context) AcceptsCharsets(offers ...string) string {
-	header := string(c.ctx.Request.Header.Peek("Accept-Charset"))
-	return matchAccept(header, offers)
+	return matchAccept(c.GetHeader(HeaderAcceptCharset), offers)
 }
 
 func (c *Context) AcceptsEncodings(offers ...string) string {
-	header := string(c.ctx.Request.Header.Peek("Accept-Encoding"))
-	return matchAccept(header, offers)
+	return matchAccept(c.GetHeader(HeaderAcceptEncoding), offers)
 }
 
 func (c *Context) AcceptsLanguages(offers ...string) string {
-	header := string(c.ctx.Request.Header.Peek("Accept-Language"))
-	return matchAccept(header, offers)
+	return matchAccept(c.GetHeader(HeaderAcceptLanguage), offers)
 }
