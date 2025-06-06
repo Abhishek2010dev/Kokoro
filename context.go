@@ -2,6 +2,7 @@ package kokoro
 
 import (
 	"mime/multipart"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -202,3 +203,13 @@ func (c *Context) AcceptsLanguages(offers ...string) string {
 func (c *Context) IsFromLocal() bool {
 	return c.ctx.RemoteIP().IsLoopback()
 }
+
+func (c *Context) Port() string {
+	addr := c.ctx.RemoteAddr().String()
+	_, port, _ := net.SplitHostPort(addr)
+	return port
+}
+
+// param functions
+// IsProxyTrusted
+// Fresh
