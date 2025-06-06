@@ -253,7 +253,6 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 		var err error
 
 		if bounds[0] == "" {
-			// suffix byte range: "-500" means last 500 bytes
 			end, err = strconv.ParseInt(bounds[1], 10, 64)
 			if err != nil || end <= 0 {
 				return nil, fmt.Errorf("invalid suffix range: %s", r)
@@ -261,10 +260,7 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 			if end > maxSize {
 				end = maxSize
 			}
-			start = maxSize - end
-			if start < 0 {
-				start = 0
-			}
+			start = max(maxSize-end, 0)
 			end = maxSize - 1
 		} else {
 			start, err = strconv.ParseInt(bounds[0], 10, 64)
@@ -285,7 +281,6 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 		}
 
 		if start >= maxSize {
-			// ignore invalid range
 			continue
 		}
 
@@ -302,6 +297,32 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 	}, nil
 }
 
+func (c *Context) Schema() string {
+	return c.Protocol()
+}
+
+func (c *Context) Secure() bool {
+	return c.Protocol() == "https"
+}
+
+func (c *Context) Subdomains(offset ...int) []string {
+	host := c.Hostname()
+	parts := strings.Split(host, ".")
+
+	n := 2
+	if len(offset) > 0 {
+		n = offset[0]
+	}
+
+	if len(parts) <= n {
+		return nil
+	}
+
+	return parts[:len(parts)-n]
+}
+
 // param functions
 // IsProxyTrusted
 // Fresh
+// SaveFile and SaveFileToStorage
+// stale
