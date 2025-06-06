@@ -210,6 +210,10 @@ func (c *Context) Port() string {
 	return port
 }
 
+func (c *Context) Protocol() string {
+	return string(c.ctx.Request.Header.Protocol())
+}
+
 // param functions
 // IsProxyTrusted
 // Fresh
