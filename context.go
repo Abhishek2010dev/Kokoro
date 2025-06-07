@@ -3,9 +3,11 @@ package kokoro
 import (
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -354,6 +356,23 @@ func (c *Context) IsXHR() bool {
 	return c.GetHeader(HeaderXRequestedWith) == "XMLHttpRequest"
 }
 
+func (c *Context) SaveFile(fh *multipart.FileHeader, destPath string) error {
+	file, err := fh.Open()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	outFile, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, file)
+	return err
+}
+
 // param functions
 // IsProxyTrusted
-// SaveFile and SaveFileToStorage
+// SaveFileToStorage
