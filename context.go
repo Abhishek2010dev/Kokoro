@@ -44,7 +44,11 @@ func (c *Context) BaseUrl() string {
 }
 
 func (c *Context) Hostname() string {
-	return string(c.ctx.Host())
+	host, _, err := net.SplitHostPort(string(c.ctx.Host()))
+	if err != nil {
+		return string(c.ctx.Host())
+	}
+	return host
 }
 
 func (c *Context) BodyRaw() []byte {
@@ -210,8 +214,10 @@ func (c *Context) IsFromLocal() bool {
 }
 
 func (c *Context) Port() string {
-	addr := c.ctx.RemoteAddr().String()
-	_, port, _ := net.SplitHostPort(addr)
+	_, port, err := net.SplitHostPort(c.ctx.RemoteAddr().String())
+	if err != nil {
+		return ""
+	}
 	return port
 }
 
@@ -229,7 +235,7 @@ type Range struct {
 }
 
 func (c *Context) Range(maxSize int64) (*Range, error) {
-	header := string(c.ctx.Request.Header.Peek("Range"))
+	header := c.GetHeader("Range")
 	if header == "" {
 		return nil, errors.New("no Range header")
 	}
@@ -240,16 +246,19 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 	}
 
 	unit := strings.TrimSpace(parts[0])
-	rangesSpec := parts[1]
+	if unit != "bytes" { // Only support "bytes" unit as per RFC 7233
+		return nil, fmt.Errorf("unsupported range unit: %s", unit)
+	}
 
+	rangesSpec := parts[1]
 	rangesStrs := strings.Split(rangesSpec, ",")
 	var ranges []HTTPRange
 
-	for _, r := range rangesStrs {
-		r = strings.TrimSpace(r)
-		bounds := strings.SplitN(r, "-", 2)
+	for _, rStr := range rangesStrs {
+		rStr = strings.TrimSpace(rStr)
+		bounds := strings.SplitN(rStr, "-", 2)
 		if len(bounds) != 2 {
-			return nil, fmt.Errorf("invalid range: %s", r)
+			return nil, fmt.Errorf("invalid range segment: %s", rStr)
 		}
 
 		var start, end int64
@@ -258,7 +267,7 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 		if bounds[0] == "" {
 			end, err = strconv.ParseInt(bounds[1], 10, 64)
 			if err != nil || end <= 0 {
-				return nil, fmt.Errorf("invalid suffix range: %s", r)
+				return nil, fmt.Errorf("invalid suffix range value: %s", rStr)
 			}
 			if end > maxSize {
 				end = maxSize
@@ -268,12 +277,13 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 		} else {
 			start, err = strconv.ParseInt(bounds[0], 10, 64)
 			if err != nil || start < 0 {
-				return nil, fmt.Errorf("invalid start range: %s", r)
+				return nil, fmt.Errorf("invalid start range value: %s", rStr)
 			}
+
 			if bounds[1] != "" {
 				end, err = strconv.ParseInt(bounds[1], 10, 64)
 				if err != nil || end < start {
-					return nil, fmt.Errorf("invalid end range: %s", r)
+					return nil, fmt.Errorf("invalid end range value: %s", rStr)
 				}
 				if end >= maxSize {
 					end = maxSize - 1
@@ -283,7 +293,7 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 			}
 		}
 
-		if start >= maxSize {
+		if start >= maxSize || start > end {
 			continue
 		}
 
@@ -291,7 +301,7 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 	}
 
 	if len(ranges) == 0 {
-		return nil, errors.New("no valid ranges")
+		return nil, errors.New("no valid byte ranges found in header")
 	}
 
 	return &Range{
@@ -301,11 +311,14 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 }
 
 func (c *Context) Schema() string {
-	return c.Protocol()
+	if c.ctx.IsTLS() {
+		return "https"
+	}
+	return "http"
 }
 
 func (c *Context) Secure() bool {
-	return c.Protocol() == "https"
+	return c.ctx.IsTLS()
 }
 
 func (c *Context) Subdomains(offset ...int) []string {
@@ -327,24 +340,28 @@ func (c *Context) Subdomains(offset ...int) []string {
 func (c *Context) Fresh() bool {
 	ifNoneMatch := c.GetHeader(HeaderIfNoneMatch)
 	etag := c.GetHeader(HeaderETag)
-
-	if ifNoneMatch != "" {
-		return ifNoneMatch == etag
+	if ifNoneMatch != "" && etag != "" {
+		if ifNoneMatch == etag {
+			return true
+		}
+		if strings.HasPrefix(ifNoneMatch, "W/") && strings.HasSuffix(etag, ifNoneMatch[2:]) {
+			return true
+		}
 	}
 
 	ifModifiedSince := c.GetHeader(HeaderIfModifiedSince)
 	lastModified := c.GetHeader(HeaderLastModified)
 
 	if ifModifiedSince != "" && lastModified != "" {
-		if modTime, err := http.ParseTime(ifModifiedSince); err == nil {
-			if lastTime, err2 := http.ParseTime(lastModified); err2 == nil {
-				if !lastTime.After(modTime) {
-					return true
-				}
+		modTime, err1 := http.ParseTime(ifModifiedSince)
+		lastTime, err2 := http.ParseTime(lastModified)
+
+		if err1 == nil && err2 == nil {
+			if !lastTime.After(modTime) {
+				return true
 			}
 		}
 	}
-
 	return false
 }
 
@@ -359,18 +376,21 @@ func (c *Context) IsXHR() bool {
 func (c *Context) SaveFile(fh *multipart.FileHeader, destPath string) error {
 	file, err := fh.Open()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open uploaded file: %w", err)
 	}
 	defer file.Close()
 
 	outFile, err := os.Create(destPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create destination file: %w", err)
 	}
 	defer outFile.Close()
 
 	_, err = io.Copy(outFile, file)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to copy file content: %w", err)
+	}
+	return nil
 }
 
 // param functions
