@@ -246,7 +246,7 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 	}
 
 	unit := strings.TrimSpace(parts[0])
-	if unit != "bytes" { // Only support "bytes" unit as per RFC 7233
+	if unit != "bytes" {
 		return nil, fmt.Errorf("unsupported range unit: %s", unit)
 	}
 
