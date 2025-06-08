@@ -4,8 +4,8 @@ import "github.com/Abhishek2010dev/kokoro"
 
 func main() {
 	server := kokoro.New()
-	server.GET("/", func(ctx *kokoro.Context) error {
-		return ctx.Text("Ok")
+	server.GET("/{name}", func(ctx *kokoro.Context) error {
+		return ctx.Text("Hello, " + ctx.Param("name"))
 	})
 	server.ListenAndServe(":3000")
 }

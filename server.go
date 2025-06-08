@@ -1,16 +1,22 @@
 package kokoro
 
-import "github.com/valyala/fasthttp"
+import (
+	"unsafe"
+
+	"github.com/valyala/fasthttp"
+)
 
 type Server struct {
 	*Router
-	errorHandler ErrorHandler
+	errorHandler   ErrorHandler
+	zeroAllocation bool
 }
 
 func New() *Server {
 	s := &Server{
-		Router:       NewRouter(),
-		errorHandler: defaultErrorHandler,
+		Router:         NewRouter(),
+		errorHandler:   defaultErrorHandler,
+		zeroAllocation: true,
 	}
 	s.Router.server = s
 
@@ -25,6 +31,11 @@ func New() *Server {
 	return s
 }
 
+func (s *Server) WithZeroAllocation(value bool) *Server {
+	s.zeroAllocation = value
+	return s
+}
+
 func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 	return func(fctx *fasthttp.RequestCtx) {
 		ctx := acquireContext(fctx)
@@ -36,6 +47,13 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 		}
 		releaseContext(ctx)
 	}
+}
+
+func (s *Server) BytesToString(value []byte) string {
+	if s.zeroAllocation {
+		return *(*string)(unsafe.Pointer(&value))
+	}
+	return string(value)
 }
 
 func (s *Server) ListenAndServe(addr string) error {

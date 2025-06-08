@@ -17,7 +17,17 @@ import (
 )
 
 type Context struct {
-	ctx *fasthttp.RequestCtx
+	ctx    *fasthttp.RequestCtx
+	server *Server
+
+	cache struct {
+		method      string
+		path        string
+		originalURL string
+		baseURL     string
+		hostname    string
+		protocol    string
+	}
 }
 
 var contextPool = sync.Pool{
@@ -34,35 +44,66 @@ func acquireContext(fctx *fasthttp.RequestCtx) *Context {
 
 func releaseContext(c *Context) {
 	c.ctx = nil
+	c.cache = struct {
+		method      string
+		path        string
+		originalURL string
+		baseURL     string
+		hostname    string
+		protocol    string
+	}{}
 	contextPool.Put(c)
 }
 
 func (c *Context) Method() string {
-	return string(c.ctx.Method())
+	if c.cache.method == "" {
+		c.cache.method = c.server.BytesToString(c.ctx.Method())
+	}
+	return c.cache.method
 }
 
 func (c *Context) Path() string {
-	return string(c.ctx.Request.URI().Path())
+	if c.cache.path == "" {
+		c.cache.path = c.server.BytesToString(c.ctx.Request.URI().Path())
+	}
+	return c.cache.path
 }
 
 func (c *Context) OriginalURL() string {
-	return string(c.ctx.RequestURI())
+	if c.cache.originalURL == "" {
+		c.cache.originalURL = c.server.BytesToString(c.ctx.RequestURI())
+	}
+	return c.cache.originalURL
 }
 
 func (c *Context) BaseUrl() string {
-	scheme := "http"
-	if c.ctx.IsTLS() {
-		scheme = "https"
+	if c.cache.baseURL == "" {
+		scheme := "http"
+		if c.ctx.IsTLS() {
+			scheme = "https"
+		}
+		c.cache.baseURL = scheme + "://" + string(c.ctx.Host())
 	}
-	return scheme + "://" + string(c.ctx.Host())
+	return c.cache.baseURL
 }
 
 func (c *Context) Hostname() string {
-	host, _, err := net.SplitHostPort(string(c.ctx.Host()))
-	if err != nil {
-		return string(c.ctx.Host())
+	if c.cache.hostname == "" {
+		host, _, err := net.SplitHostPort(string(c.ctx.Host()))
+		if err != nil {
+			c.cache.hostname = string(c.ctx.Host())
+		} else {
+			c.cache.hostname = host
+		}
 	}
-	return host
+	return c.cache.hostname
+}
+
+func (c *Context) Protocol() string {
+	if c.cache.protocol == "" {
+		c.cache.protocol = string(c.ctx.Request.Header.Protocol())
+	}
+	return c.cache.protocol
 }
 
 func (c *Context) BodyRaw() []byte {
@@ -109,18 +150,15 @@ func (c *Context) RealIP() string {
 			return strings.TrimSpace(parts[0])
 		}
 	}
-
 	return c.ctx.RemoteIP().String()
 }
 
 func (c *Context) Queries() map[string]string {
 	queryArgs := c.ctx.QueryArgs()
 	params := make(map[string]string, queryArgs.Len())
-
 	queryArgs.VisitAll(func(key, value []byte) {
 		params[string(key)] = string(value)
 	})
-
 	return params
 }
 
@@ -235,10 +273,6 @@ func (c *Context) Port() string {
 	return port
 }
 
-func (c *Context) Protocol() string {
-	return string(c.ctx.Request.Header.Protocol())
-}
-
 type HTTPRange struct {
 	Start, End int64
 }
@@ -324,6 +358,13 @@ func (c *Context) Range(maxSize int64) (*Range, error) {
 	}, nil
 }
 
+func max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func (c *Context) Schema() string {
 	if c.ctx.IsTLS() {
 		return "https"
@@ -347,7 +388,6 @@ func (c *Context) Subdomains(offset ...int) []string {
 	if len(parts) <= n {
 		return nil
 	}
-
 	return parts[:len(parts)-n]
 }
 
@@ -407,9 +447,12 @@ func (c *Context) SaveFile(fh *multipart.FileHeader, destPath string) error {
 	return nil
 }
 
-// improve it later
 func (c *Context) Param(key string) string {
-	return c.ctx.UserValue(key).(string)
+	value := c.ctx.UserValue(key)
+	if id, ok := value.(string); ok {
+		return id
+	}
+	return ""
 }
 
 func (c *Context) Status(code int) *Context {
@@ -418,7 +461,7 @@ func (c *Context) Status(code int) *Context {
 }
 
 func (c *Context) Text(value string) error {
-	c.ctx.Response.AppendBodyString(value)
+	c.ctx.Response.SetBodyString(value)
 	return nil
 }
 
