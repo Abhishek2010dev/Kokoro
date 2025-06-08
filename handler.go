@@ -12,17 +12,15 @@ package kokoro
 //	}
 type HandlerFunc func(*Context) error
 
-// MiddlewareFunc defines a function that executes additional logic
-// around the request lifecycle. Middleware functions can perform tasks
-// like logging, authentication, panic recovery, response compression, etc.
+// MiddlewareFunc defines a function that wraps a HandlerFunc with additional behavior.
+// Middleware can be used for logging, authentication, compression, error handling, etc.
 //
-// Middleware is executed in the order it is registered. Use c.Next()
-// within the middleware to pass control to the next handler in the chain.
+// It follows the standard Go middleware pattern:
 //
-// Example:
-//
-//	func Logger(c *Context) error {
-//	    log.Printf("Incoming request: %s", c.ctx.URI().Path())
-//	    return c.Next()
+//	func Logger(next HandlerFunc) HandlerFunc {
+//	    return func(c *Context) error {
+//	        log.Printf("Incoming request: %s", c.Path())
+//	        return next(c)
+//	    }
 //	}
-type MiddlewareFunc func(*Context) error
+type MiddlewareFunc func(HandlerFunc) HandlerFunc

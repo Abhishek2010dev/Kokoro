@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/valyala/fasthttp"
 )
@@ -19,8 +20,21 @@ type Context struct {
 	ctx *fasthttp.RequestCtx
 }
 
-func NewContext(ctx *fasthttp.RequestCtx) *Context {
-	return &Context{ctx}
+var contextPool = sync.Pool{
+	New: func() any {
+		return &Context{}
+	},
+}
+
+func acquireContext(fctx *fasthttp.RequestCtx) *Context {
+	c := contextPool.Get().(*Context)
+	c.ctx = fctx
+	return c
+}
+
+func releaseContext(c *Context) {
+	c.ctx = nil
+	contextPool.Put(c)
 }
 
 func (c *Context) Method() string {
@@ -390,6 +404,21 @@ func (c *Context) SaveFile(fh *multipart.FileHeader, destPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to copy file content: %w", err)
 	}
+	return nil
+}
+
+// improve it later
+func (c *Context) Param(key string) string {
+	return c.ctx.UserValue(key).(string)
+}
+
+func (c *Context) Status(code int) *Context {
+	c.ctx.SetStatusCode(code)
+	return c
+}
+
+func (c *Context) Text(value string) error {
+	c.ctx.Response.AppendBodyString(value)
 	return nil
 }
 
