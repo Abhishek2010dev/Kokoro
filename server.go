@@ -38,8 +38,8 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 	}
 }
 
-func (s *Server) ListenAndServe(addr string, router Router) error {
-	return fasthttp.ListenAndServe(addr, router.r.Handler)
+func (s *Server) ListenAndServe(addr string) error {
+	return fasthttp.ListenAndServe(addr, s.r.Handler)
 }
 
 func defaultErrorHandler(c *Context, err error) error {
@@ -47,17 +47,4 @@ func defaultErrorHandler(c *Context, err error) error {
 		return c.Status(e.Code).Text(e.Message)
 	}
 	return c.Status(StatusInternalServerError).Text("Internal Server Error")
-}
-
-type HTTPError struct {
-	Code    int
-	Message string
-}
-
-func (e *HTTPError) Error() string {
-	return e.Message
-}
-
-func (s *Server) Listen(addr string) error {
-	return fasthttp.ListenAndServe(addr, s.r.Handler)
 }
