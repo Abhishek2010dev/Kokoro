@@ -1,6 +1,8 @@
 package kokoro
 
 import (
+	"encoding/xml"
+
 	"github.com/bytedance/sonic"
 )
 
@@ -26,4 +28,14 @@ func defaultJsonEncoder(v any) ([]byte, error) {
 // It uses Sonic's default configuration for decoding.
 func defaultJsonDecoder(data []byte, v any) error {
 	return sonic.Unmarshal(data, v)
+}
+
+// defaultXMLEncoder is Kokoro's default XML encoder using encoding/xml.
+func defaultXMLEncoder(v any) ([]byte, error) {
+	return xml.MarshalIndent(v, "", "  ")
+}
+
+// defaultXMLDecoder is Kokoro's default XML decoder using encoding/xml.
+func defaultXMLDecoder(data []byte, v any) error {
+	return xml.Unmarshal(data, v)
 }

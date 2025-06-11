@@ -481,6 +481,16 @@ func (c *Context) JSON(value any) error {
 	return nil
 }
 
+func (c *Context) XML(value any) error {
+	data, err := c.server.XmlEncoder(value)
+	if err != nil {
+		return err
+	}
+	c.SetContentType("application/xml")
+	c.ctx.SetBody(data)
+	return nil
+}
+
 // param functions
 // IsProxyTrusted
 // SaveFileToStorage
