@@ -1,26 +1,32 @@
 package kokoro
 
-// HandlerFunc defines a function to handle HTTP requests.
+// HandlerFunc defines a function to handle HTTP requests in Kokoro.
 // It receives a pointer to a Context, which wraps the fasthttp.RequestCtx,
-// and returns an error that can be used for centralized error handling.
+// and returns an error to enable centralized error handling.
+//
+// HandlerFunc is the primary way to define routes and handle requests.
 //
 // Example:
 //
 //	func HelloHandler(c *kokoro.Context) error {
-//	    c.Text(200, "Hello, world!")
-//	    return nil
+//	    return c.Text(200, "Hello, world!")
 //	}
 type HandlerFunc func(*Context) error
 
-// MiddlewareFunc defines a function that wraps a HandlerFunc with additional behavior.
-// Middleware can be used for logging, authentication, compression, error handling, etc.
+// MiddlewareFunc defines a function that wraps a HandlerFunc to add additional behavior.
 //
-// It follows the standard Go middleware pattern:
+// Middleware is commonly used for logging, authentication, recovery,
+// compression, rate limiting, and other cross-cutting concerns.
 //
-//	func Logger(next HandlerFunc) HandlerFunc {
-//	    return func(c *Context) error {
-//	        log.Printf("Incoming request: %s", c.Path())
+// It follows the standard Go middleware pattern where middleware is composed
+// by wrapping the next handler.
+//
+// Example:
+//
+//	func Logger(next kokoro.HandlerFunc) kokoro.HandlerFunc {
+//	    return func(c *kokoro.Context) error {
+//	        log.Printf("Incoming request: %s %s", c.Method(), c.Path())
 //	        return next(c)
 //	    }
 //	}
-type MiddlewareFunc func(HandlerFunc) HandlerFunc
+type MiddlewareFunc func(next HandlerFunc) HandlerFunc

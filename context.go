@@ -36,9 +36,10 @@ var contextPool = sync.Pool{
 	},
 }
 
-func acquireContext(fctx *fasthttp.RequestCtx) *Context {
+func acquireContext(fctx *fasthttp.RequestCtx, server *Server) *Context {
 	c := contextPool.Get().(*Context)
 	c.ctx = fctx
+	c.server = server
 	return c
 }
 
@@ -461,7 +462,22 @@ func (c *Context) Status(code int) *Context {
 }
 
 func (c *Context) Text(value string) error {
+	c.SetContentType("text/plain; charset=utf-8")
 	c.ctx.Response.SetBodyString(value)
+	return nil
+}
+
+func (c *Context) SetContentType(value string) {
+	c.ctx.Response.Header.SetContentType(value)
+}
+
+func (c *Context) JSON(value any) error {
+	data, err := c.server.JsonEncoder(value)
+	if err != nil {
+		return err
+	}
+	c.SetContentType("application/json")
+	c.ctx.SetBody(data)
 	return nil
 }
 

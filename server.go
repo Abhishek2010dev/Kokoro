@@ -10,6 +10,8 @@ type Server struct {
 	*Router
 	errorHandler   ErrorHandler
 	zeroAllocation bool
+	JsonEncoder    EncoderFunc
+	JsonDecoder    DecoderFunc
 }
 
 func New() *Server {
@@ -17,6 +19,8 @@ func New() *Server {
 		Router:         NewRouter(),
 		errorHandler:   defaultErrorHandler,
 		zeroAllocation: true,
+		JsonEncoder:    defaultJsonEncoder,
+		JsonDecoder:    defaultJsonDecoder,
 	}
 	s.Router.server = s
 
@@ -38,7 +42,7 @@ func (s *Server) WithZeroAllocation(value bool) *Server {
 
 func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 	return func(fctx *fasthttp.RequestCtx) {
-		ctx := acquireContext(fctx)
+		ctx := acquireContext(fctx, s)
 		if err := h(ctx); err != nil {
 			err := s.errorHandler(ctx, err)
 			if err != nil {
