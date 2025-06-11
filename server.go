@@ -66,7 +66,7 @@ func (s *Server) ListenAndServe(addr string) error {
 
 func defaultErrorHandler(c *Context, err error) error {
 	if e, ok := err.(*HTTPError); ok {
-		return c.Status(e.Code).Text(e.Message)
+		return c.Status(e.Code).JSON(H{"message": e.Message})
 	}
-	return c.Status(StatusInternalServerError).Text("Internal Server Error")
+	return c.Status(StatusInternalServerError).JSON(H{"message": "Internal Server Error"})
 }
