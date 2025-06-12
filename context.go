@@ -70,14 +70,14 @@ func (c *Context) Path() string {
 	return c.cache.path
 }
 
-func (c *Context) OriginalURL() string {
+func (c *Context) URL() string {
 	if c.cache.originalURL == "" {
 		c.cache.originalURL = c.server.BytesToString(c.ctx.RequestURI())
 	}
 	return c.cache.originalURL
 }
 
-func (c *Context) BaseUrl() string {
+func (c *Context) BaseURL() string {
 	if c.cache.baseURL == "" {
 		scheme := "http"
 		if c.ctx.IsTLS() {
@@ -88,7 +88,7 @@ func (c *Context) BaseUrl() string {
 	return c.cache.baseURL
 }
 
-func (c *Context) Hostname() string {
+func (c *Context) Host() string {
 	if c.cache.hostname == "" {
 		host, _, err := net.SplitHostPort(string(c.ctx.Host()))
 		if err != nil {
@@ -107,11 +107,11 @@ func (c *Context) Protocol() string {
 	return c.cache.protocol
 }
 
-func (c *Context) BodyRaw() []byte {
+func (c *Context) BodyBytes() []byte {
 	return c.ctx.Response.Body()
 }
 
-func (c *Context) Body() []byte {
+func (c *Context) PostBody() []byte {
 	return c.ctx.PostBody()
 }
 
@@ -132,7 +132,7 @@ func (c *Context) MultipartForm() (*multipart.Form, error) {
 }
 
 func (c *Context) GetForwardedIPs() []string {
-	xForwardedFor := c.GetHeader(HeaderForwardedFor)
+	xForwardedFor := c.Header(HeaderForwardedFor)
 	if xForwardedFor == "" {
 		return nil
 	}
@@ -144,7 +144,7 @@ func (c *Context) GetForwardedIPs() []string {
 }
 
 func (c *Context) RealIP() string {
-	xForwardedFor := c.GetHeader(HeaderForwardedFor)
+	xForwardedFor := c.Header(HeaderForwardedFor)
 	if xForwardedFor != "" {
 		parts := strings.Split(string(xForwardedFor), ",")
 		if len(parts) > 0 {
@@ -154,7 +154,7 @@ func (c *Context) RealIP() string {
 	return c.ctx.RemoteIP().String()
 }
 
-func (c *Context) Queries() map[string]string {
+func (c *Context) QueryParams() map[string]string {
 	queryArgs := c.ctx.QueryArgs()
 	params := make(map[string]string, queryArgs.Len())
 	queryArgs.VisitAll(func(key, value []byte) {
@@ -174,7 +174,7 @@ func (c *Context) Query(key string, defaultValue ...string) string {
 	return ""
 }
 
-func (c *Context) GetHeader(key string) string {
+func (c *Context) Header(key string) string {
 	return string(c.ctx.Request.Header.Peek(key))
 }
 
@@ -182,7 +182,7 @@ func (c *Context) SetHeader(key, value string) {
 	c.ctx.Request.Header.Set(key, value)
 }
 
-func (c *Context) GetAllHeaders() map[string]string {
+func (c *Context) Headers() map[string]string {
 	headers := make(map[string]string)
 	c.ctx.Request.Header.VisitAll(func(key, value []byte) {
 		headers[string(key)] = string(value)
@@ -247,26 +247,26 @@ func matchAccept(header string, offers []string) string {
 }
 
 func (c *Context) Accepts(offers ...string) string {
-	return matchAccept(c.GetHeader(HeaderAccept), offers)
+	return matchAccept(c.Header(HeaderAccept), offers)
 }
 
-func (c *Context) AcceptsCharsets(offers ...string) string {
-	return matchAccept(c.GetHeader(HeaderAcceptCharset), offers)
+func (c *Context) AcceptsCharset(offers ...string) string {
+	return matchAccept(c.Header(HeaderAcceptCharset), offers)
 }
 
-func (c *Context) AcceptsEncodings(offers ...string) string {
-	return matchAccept(c.GetHeader(HeaderAcceptEncoding), offers)
+func (c *Context) AcceptsEncoding(offers ...string) string {
+	return matchAccept(c.Header(HeaderAcceptEncoding), offers)
 }
 
-func (c *Context) AcceptsLanguages(offers ...string) string {
-	return matchAccept(c.GetHeader(HeaderAcceptLanguage), offers)
+func (c *Context) AcceptsLanguage(offers ...string) string {
+	return matchAccept(c.Header(HeaderAcceptLanguage), offers)
 }
 
-func (c *Context) IsFromLocal() bool {
+func (c *Context) IsLocal() bool {
 	return c.ctx.RemoteIP().IsLoopback()
 }
 
-func (c *Context) Port() string {
+func (c *Context) RemotePort() string {
 	_, port, err := net.SplitHostPort(c.ctx.RemoteAddr().String())
 	if err != nil {
 		return ""
@@ -283,8 +283,8 @@ type Range struct {
 	Ranges []HTTPRange
 }
 
-func (c *Context) Range(maxSize int64) (*Range, error) {
-	header := c.GetHeader("Range")
+func (c *Context) Ranges(maxSize int64) (*Range, error) {
+	header := c.Header("Range")
 	if header == "" {
 		return nil, errors.New("no Range header")
 	}
@@ -366,19 +366,19 @@ func max(a, b int64) int64 {
 	return b
 }
 
-func (c *Context) Schema() string {
+func (c *Context) Scheme() string {
 	if c.ctx.IsTLS() {
 		return "https"
 	}
 	return "http"
 }
 
-func (c *Context) Secure() bool {
+func (c *Context) IsSecure() bool {
 	return c.ctx.IsTLS()
 }
 
 func (c *Context) Subdomains(offset ...int) []string {
-	host := c.Hostname()
+	host := c.Host()
 	parts := strings.Split(host, ".")
 
 	n := 2
@@ -393,8 +393,8 @@ func (c *Context) Subdomains(offset ...int) []string {
 }
 
 func (c *Context) Fresh() bool {
-	ifNoneMatch := c.GetHeader(HeaderIfNoneMatch)
-	etag := c.GetHeader(HeaderETag)
+	ifNoneMatch := c.Header(HeaderIfNoneMatch)
+	etag := c.Header(HeaderETag)
 	if ifNoneMatch != "" && etag != "" {
 		if ifNoneMatch == etag {
 			return true
@@ -404,8 +404,8 @@ func (c *Context) Fresh() bool {
 		}
 	}
 
-	ifModifiedSince := c.GetHeader(HeaderIfModifiedSince)
-	lastModified := c.GetHeader(HeaderLastModified)
+	ifModifiedSince := c.Header(HeaderIfModifiedSince)
+	lastModified := c.Header(HeaderLastModified)
 
 	if ifModifiedSince != "" && lastModified != "" {
 		modTime, err1 := http.ParseTime(ifModifiedSince)
@@ -425,7 +425,7 @@ func (c *Context) Stale() bool {
 }
 
 func (c *Context) IsXHR() bool {
-	return c.GetHeader(HeaderXRequestedWith) == "XMLHttpRequest"
+	return c.Header(HeaderXRequestedWith) == "XMLHttpRequest"
 }
 
 func (c *Context) SaveFile(fh *multipart.FileHeader, destPath string) error {
@@ -456,67 +456,67 @@ func (c *Context) Param(key string) string {
 	return ""
 }
 
-func (c *Context) Status(code int) *Context {
+func (c *Context) SetStatus(code int) *Context {
 	c.ctx.SetStatusCode(code)
 	return c
 }
 
 func (c *Context) Text(value string) error {
-	c.SetContentType("text/plain; charset=utf-8")
+	c.ContentType("text/plain; charset=utf-8")
 	c.ctx.Response.SetBodyString(value)
 	return nil
 }
 
-func (c *Context) SetContentType(value string) {
+func (c *Context) ContentType(value string) {
 	c.ctx.Response.Header.SetContentType(value)
 }
 
-func (c *Context) JSON(value any) error {
+func (c *Context) SendJSON(value any) error {
 	data, err := c.server.JsonEncoder(value)
 	if err != nil {
 		return err
 	}
-	c.SetContentType("application/json")
+	c.ContentType("application/json")
 	c.ctx.SetBody(data)
 	return nil
 }
 
-func (c *Context) XML(value any) error {
+func (c *Context) SendXML(value any) error {
 	data, err := c.server.XmlEncoder(value)
 	if err != nil {
 		return err
 	}
-	c.SetContentType("application/xml")
+	c.ContentType("application/xml")
 	c.ctx.SetBody(data)
 	return nil
 }
 
-func (c *Context) YAML(value any) error {
+func (c *Context) SendYAML(value any) error {
 	data, err := c.server.YamlEncoder(value)
 	if err != nil {
 		return err
 	}
-	c.SetContentType("application/x-yaml")
+	c.ContentType("application/x-yaml")
 	c.ctx.SetBody(data)
 	return nil
 }
 
-func (c *Context) TOML(value any) error {
+func (c *Context) SendTOML(value any) error {
 	data, err := c.server.TomlEncoder(value)
 	if err != nil {
 		return err
 	}
-	c.SetContentType("application/toml")
+	c.ContentType("application/toml")
 	c.ctx.SetBody(data)
 	return nil
 }
 
-func (c *Context) Cbar(value any) error {
+func (c *Context) SendCBAR(value any) error {
 	data, err := c.server.CbarEncoder(value)
 	if err != nil {
 		return err
 	}
-	c.SetContentType("application/cbar")
+	c.ContentType("application/cbar")
 	c.ctx.SetBody(data)
 	return nil
 }
