@@ -491,6 +491,10 @@ func (c *Context) XML(value any) error {
 	return nil
 }
 
+func (c *Context) StatusCode() int {
+	return c.ctx.Response.StatusCode()
+}
+
 // param functions
 // IsProxyTrusted
 // SaveFileToStorage

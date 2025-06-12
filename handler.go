@@ -13,20 +13,35 @@ package kokoro
 //	}
 type HandlerFunc func(*Context) error
 
-// MiddlewareFunc defines a function that wraps a HandlerFunc to add additional behavior.
+// middlewareFunc is an internal type used by Kokoro to compose middleware
+// in the traditional Go style (func(next HandlerFunc) HandlerFunc).
 //
-// Middleware is commonly used for logging, authentication, recovery,
-// compression, rate limiting, and other cross-cutting concerns.
+// This type is kept unexported as Kokoro promotes a simpler middleware signature
+// using NextMiddleware instead, which avoids nested closures and improves readability.
 //
-// It follows the standard Go middleware pattern where middleware is composed
-// by wrapping the next handler.
+// Example of middlewareFunc usage internally:
+//
+//	func logger(next HandlerFunc) HandlerFunc {
+//	    return func(ctx *Context) error {
+//	        log.Println("Request:", ctx.Path())
+//	        return next(ctx)
+//	    }
+//	}
+type middlewareFunc func(next HandlerFunc) HandlerFunc
+
+// NextMiddleware defines a modern middleware signature that is inspired by frameworks
+// like Express.js and Axum. It takes the current Context and a `next` handler to invoke,
+// and returns an error.
+//
+// This signature improves developer experience (DX) by avoiding closure-wrapping
+// boilerplate, making it easier to write, debug, and read middleware logic.
 //
 // Example:
 //
-//	func Logger(next kokoro.HandlerFunc) kokoro.HandlerFunc {
-//	    return func(c *kokoro.Context) error {
-//	        log.Printf("Incoming request: %s %s", c.Method(), c.Path())
-//	        return next(c)
+//	func AuthMiddleware(ctx *Context, next HandlerFunc) error {
+//	    if !ctx.HasAuth() {
+//	        return ctx.Status(401).Text("Unauthorized")
 //	    }
+//	    return next(ctx)
 //	}
-type MiddlewareFunc func(next HandlerFunc) HandlerFunc
+type NextMiddleware func(ctx *Context, next HandlerFunc) error
