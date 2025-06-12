@@ -16,6 +16,10 @@ type Server struct {
 	XmlDecoder     DecoderFunc
 	YamlEncoder    EncoderFunc
 	YamlDecoder    DecoderFunc
+	TomlEncoder    EncoderFunc
+	TomlDecoder    DecoderFunc
+	CbarEncoder    EncoderFunc
+	CabarDecoder   DecoderFunc
 }
 
 func New() *Server {
@@ -29,6 +33,10 @@ func New() *Server {
 		XmlDecoder:     defaultXMLDecoder,
 		YamlEncoder:    defaultYamlEncoder,
 		YamlDecoder:    defaultXMLDecoder,
+		TomlEncoder:    defaultTomlEncoder,
+		TomlDecoder:    defaultTomlDecoder,
+		CbarEncoder:    defaultCborEncoder,
+		CabarDecoder:   defaultCborDecoder,
 	}
 	s.Router.server = s
 

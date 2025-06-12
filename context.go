@@ -502,11 +502,21 @@ func (c *Context) YAML(value any) error {
 }
 
 func (c *Context) TOML(value any) error {
-	data, err := c.server.YamlEncoder(value)
+	data, err := c.server.TomlEncoder(value)
 	if err != nil {
 		return err
 	}
 	c.SetContentType("application/toml")
+	c.ctx.SetBody(data)
+	return nil
+}
+
+func (c *Context) Cbar(value any) error {
+	data, err := c.server.CbarEncoder(value)
+	if err != nil {
+		return err
+	}
+	c.SetContentType("application/cbar")
 	c.ctx.SetBody(data)
 	return nil
 }
