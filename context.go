@@ -491,6 +491,16 @@ func (c *Context) XML(value any) error {
 	return nil
 }
 
+func (c *Context) YAML(value any) error {
+	data, err := c.server.YamlEncoder(value)
+	if err != nil {
+		return err
+	}
+	c.SetContentType("application/x-yaml")
+	c.ctx.SetBody(data)
+	return nil
+}
+
 func (c *Context) StatusCode() int {
 	return c.ctx.Response.StatusCode()
 }

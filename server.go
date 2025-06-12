@@ -14,6 +14,8 @@ type Server struct {
 	JsonDecoder    DecoderFunc
 	XmlEncoder     EncoderFunc
 	XmlDecoder     DecoderFunc
+	YamlEncoder    EncoderFunc
+	YamlDecoder    DecoderFunc
 }
 
 func New() *Server {
@@ -25,6 +27,8 @@ func New() *Server {
 		JsonDecoder:    defaultJsonDecoder,
 		XmlEncoder:     defaultXMLEncoder,
 		XmlDecoder:     defaultXMLDecoder,
+		YamlEncoder:    defaultYamlEncoder,
+		YamlDecoder:    defaultXMLDecoder,
 	}
 	s.Router.server = s
 
