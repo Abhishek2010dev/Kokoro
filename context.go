@@ -3,16 +3,15 @@ package kokoro
 import (
 	"errors"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/savsgio/gotils/nocopy"
 	"github.com/valyala/fasthttp"
 )
 
@@ -20,6 +19,7 @@ import (
 // It wraps fasthttp.RequestCtx and provides high-level methods for
 // accessing request data and building responses.
 type Context struct {
+	noCopy nocopy.NoCopy        // nolint:structcheck,unused
 	ctx    *fasthttp.RequestCtx // The underlying fasthttp request context.
 	server *Server              // A reference to the Kokoro server instance.
 
@@ -501,28 +501,12 @@ func (c *Context) IsXHR() bool {
 }
 
 // SaveFile saves an uploaded file (represented by *multipart.FileHeader) to the specified destPath on the server's file system.
-func (c *Context) SaveFile(fh *multipart.FileHeader, destPath string) error {
-	file, err := fh.Open()
-	if err != nil {
-		return fmt.Errorf("failed to open uploaded file: %w", err)
-	}
-	defer file.Close() // Ensure the uploaded file is closed
-
-	outFile, err := os.Create(destPath)
-	if err != nil {
-		return fmt.Errorf("failed to create destination file: %w", err)
-	}
-	defer outFile.Close() // Ensure the destination file is closed
-
-	_, err = io.Copy(outFile, file) // Copy content from uploaded file to destination
-	if err != nil {
-		return fmt.Errorf("failed to copy file content: %w", err)
-	}
-	return nil
+func (c *Context) SaveFile(fh *multipart.FileHeader, path string) error {
+	return fasthttp.SaveMultipartFile(fh, path)
 }
 
 // Param retrieves a path parameter from the route by its key.
-// For example, in a route "/users/:id", c.Param("id") would return the value matched by :id.
+// For example, in a route "/users/{id}", c.Param("id") would return the value matched by {id}.
 func (c *Context) Param(key string) string {
 	value := c.ctx.UserValue(key)
 	if id, ok := value.(string); ok {
@@ -533,13 +517,13 @@ func (c *Context) Param(key string) string {
 
 // SetStatus sets the HTTP status code for the response.
 // Returns the Context itself for chaining.
-func (c *Context) SetStatus(code int) *Context {
+func (c *Context) Status(code int) *Context {
 	c.ctx.SetStatusCode(code)
 	return c
 }
 
 // Text sends a plain text response with the content type set to text/plain; charset=utf-8.
-func (c *Context) Text(value string) error {
+func (c *Context) SendText(value string) error {
 	c.ContentType("text/plain; charset=utf-8")
 	c.ctx.Response.SetBodyString(value)
 	return nil
@@ -563,7 +547,7 @@ func (c *Context) SendJSON(value any) error {
 }
 
 // SendXML serializes the given value to XML and sends it as the response body
-// with Content-Type: application/xml. Requires the Server to have an XmlEncoder configured.
+// with Content-Type: application/xml. R/equires th Server to have an XmlEncoder configured.
 func (c *Context) SendXML(value any) error {
 	data, err := c.server.XmlEncoder(value)
 	if err != nil {
@@ -631,4 +615,17 @@ func (c *Context) IsProxyTrusted() bool {
 		return false
 	}
 	return c.server.isTrustedProxy(ip)
+}
+
+// SendFile writes the file at the given path to the response body.
+//
+// It uses fasthttp's built-in file serving, which sets the appropriate Content-Type
+// and efficiently streams the file to the client. This is useful for serving static
+// files, downloads, images, etc.
+//
+// Note: This method does not perform file existence checks. If the file does not exist,
+// Kokoro will return a 404 response automatically.
+func (c *Context) SendFile(path string) error {
+	c.ctx.SendFile(path)
+	return nil
 }

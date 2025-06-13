@@ -1,12 +1,16 @@
 package kokoro
 
 import (
+	"strings"
+
 	"github.com/fasthttp/router"
+	"github.com/savsgio/gotils/nocopy"
 	"github.com/valyala/fasthttp"
 )
 
 // Router handles route registration, grouping, and middleware management.
 type Router struct {
+	nocopy            nocopy.NoCopy // nolint:structcheck,unused
 	r                 *router.Router
 	globalMiddlewares []middlewareFunc
 	basePath          string
@@ -44,42 +48,42 @@ func (r *Router) Route(prefix string, fn func(*Router)) {
 
 // GET registers a route that matches the GET HTTP method.
 func (r *Router) GET(path string, handler HandlerFunc, mws ...NextMiddleware) {
-	r.add(fasthttp.MethodGet, path, handler, mws...)
+	r.add(MethodGet, path, handler, mws...)
 }
 
 // POST registers a route that matches the POST HTTP method.
 func (r *Router) POST(path string, handler HandlerFunc, mws ...NextMiddleware) {
-	r.add(fasthttp.MethodPost, path, handler, mws...)
+	r.add(MethodPost, path, handler, mws...)
 }
 
 // PUT registers a route that matches the PUT HTTP method.
 func (r *Router) PUT(path string, handler HandlerFunc, mws ...NextMiddleware) {
-	r.add(fasthttp.MethodPut, path, handler, mws...)
+	r.add(MethodPut, path, handler, mws...)
 }
 
 // PATCH registers a route that matches the PATCH HTTP method.
 func (r *Router) PATCH(path string, handler HandlerFunc, mws ...NextMiddleware) {
-	r.add(fasthttp.MethodPatch, path, handler, mws...)
+	r.add(MethodPatch, path, handler, mws...)
 }
 
 // DELETE registers a route that matches the DELETE HTTP method.
 func (r *Router) DELETE(path string, handler HandlerFunc, mws ...NextMiddleware) {
-	r.add(fasthttp.MethodDelete, path, handler, mws...)
+	r.add(MethodDelete, path, handler, mws...)
 }
 
 // HEAD registers a route that matches the HEAD HTTP method.
 func (r *Router) HEAD(path string, handler HandlerFunc, mws ...NextMiddleware) {
-	r.add(fasthttp.MethodHead, path, handler, mws...)
+	r.add(MethodHead, path, handler, mws...)
 }
 
 // OPTIONS registers a route that matches the OPTIONS HTTP method.
 func (r *Router) OPTIONS(path string, handler HandlerFunc, mws ...NextMiddleware) {
-	r.add(fasthttp.MethodOptions, path, handler, mws...)
+	r.add(MethodOptions, path, handler, mws...)
 }
 
 // CONNECT registers a route that matches the CONNECT HTTP method.
 func (r *Router) CONNECT(path string, handler HandlerFunc, mws ...NextMiddleware) {
-	r.add(fasthttp.MethodConnect, path, handler, mws...)
+	r.add(MethodConnect, path, handler, mws...)
 }
 
 // TRACE registers a route that matches the TRACE HTTP method.
@@ -100,7 +104,6 @@ func (r *Router) Any(path string, handler HandlerFunc, mws ...NextMiddleware) {
 		fasthttp.MethodConnect,
 		"TRACE", // TRACE method as string literal
 	}
-
 	for _, method := range methods {
 		r.add(method, path, handler, mws...)
 	}
@@ -109,12 +112,38 @@ func (r *Router) Any(path string, handler HandlerFunc, mws ...NextMiddleware) {
 // add is a helper to register a route with the given method, path,
 // handler, and optional route-specific middlewares.
 func (r *Router) add(method string, path string, handler HandlerFunc, mws ...NextMiddleware) {
-	fullPath := r.basePath + path
-
+	fullPath := strings.TrimRight(r.basePath, "/") + "/" + strings.TrimLeft(path, "/")
 	routeMws := convertNext(mws...)
 	allMws := append(r.globalMiddlewares, routeMws...)
 	finalHandler := chainMiddlewares(handler, allMws...)
 	r.r.Handle(method, fullPath, r.server.wrap(finalHandler))
+}
+
+// ServeFile returns HTTP response containing compressed file contents
+// from the given path
+//
+// HTTP response may contain uncompressed file contents in the following cases:
+//
+//   - Missing 'Accept-Encoding: gzip' request header.
+//   - No write access to directory containing the file.
+//
+// Directory contents is returned if path points to directory.
+func (r *Router) ServeFile(path, filepath string) {
+	r.GET(r.basePath+path, func(ctx *Context) error {
+		return ctx.SendFile(filepath)
+	})
+}
+
+// Handle registers a route for a specific HTTP method and path with the provided handler and optional middlewares.
+// This is a generic method that delegates to the `add` helper.
+func (r *Router) Handle(method, path string, handler HandlerFunc, mws ...NextMiddleware) {
+	r.add(method, path, handler, mws...)
+}
+
+// SetMethodNotAllowed sets the handler for HTTP requests where the method is not allowed for a given path.
+// This handler will be invoked by the underlying fasthttp router.
+func (r *Router) SetMethodNotAllowed(h HandlerFunc) {
+	r.r.MethodNotAllowed = r.server.wrap(h)
 }
 
 // chainMiddlewares applies middleware functions in reverse order to the handler,

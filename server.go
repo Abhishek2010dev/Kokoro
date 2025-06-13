@@ -5,10 +5,12 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/savsgio/gotils/nocopy"
 	"github.com/valyala/fasthttp"
 )
 
 type Server struct {
+	noCopy nocopy.NoCopy // nolint:structcheck,unused
 	*Router
 	errorHandler   ErrorHandler
 	zeroAllocation bool
@@ -79,7 +81,7 @@ func (s *Server) wrap(h HandlerFunc) fasthttp.RequestHandler {
 		if err := h(ctx); err != nil {
 			err := s.errorHandler(ctx, err)
 			if err != nil {
-				_ = ctx.SetStatus(StatusInternalServerError).Text("Internal Server Error") // we can not do any thing here
+				_ = ctx.SendStatusCode(StatusInternalServerError) // we can not do any thing here
 			}
 		}
 		releaseContext(ctx)
@@ -93,13 +95,13 @@ func (s *Server) BytesToString(value []byte) string {
 	return string(value)
 }
 
-func (s *Server) ListenAndServe(addr string) error {
+func (s *Server) Listen(addr string) error {
 	return fasthttp.ListenAndServe(addr, s.r.Handler)
 }
 
 func defaultErrorHandler(c *Context, err error) error {
 	if e, ok := err.(*HTTPError); ok {
-		return c.SetStatus(e.Code).SendJSON(H{"message": e.Message})
+		return c.Status(e.Code).SendJSON(H{"message": e.Message})
 	}
-	return c.SetStatus(StatusInternalServerError).SendJSON(H{"message": "Internal Server Error"})
+	return c.Status(StatusInternalServerError).SendJSON(H{"message": "Internal Server Error"})
 }
